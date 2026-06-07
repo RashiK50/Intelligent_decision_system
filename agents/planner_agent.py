@@ -1,17 +1,17 @@
 from registry.prompt_registry import load_prompt
-from state.intent_schema import IntentOutput
+from state.planner_schema import PlannerOutput
 from tools.llm import get_llm
 
 
-def intent_agent(state):
+def planner_agent(state):
 
     llm = get_llm()
 
     structured_llm = llm.with_structured_output(
-        IntentOutput
+        PlannerOutput
     )
 
-    prompt = load_prompt("intent")
+    prompt = load_prompt("planner")
 
     result = structured_llm.invoke(
         f"""
@@ -19,10 +19,15 @@ def intent_agent(state):
 
         User Query:
         {state['user_query']}
+
+        Intent:
+        {state['intent']}
+
+        Sub Intent:
+        {state['sub_intent']}
         """
     )
 
-    state["intent"] = result.intent
-    state["sub_intent"] = result.sub_intent
+    state["plan"] = result.model_dump()
 
     return state

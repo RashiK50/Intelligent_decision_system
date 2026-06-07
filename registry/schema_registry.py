@@ -7,7 +7,8 @@ SCHEMA_REGISTRY = {
             "customer_id",
             "customer_unique_id",
             "customer_city",
-            "customer_state"
+            "customer_state",
+            "customer_zip_code_prefix"
         ]
     },
 
@@ -23,7 +24,9 @@ SCHEMA_REGISTRY = {
             "order_status",
             "order_purchase_timestamp",
             "order_approved_at",
-            "order_delivered_customer_date"
+            "order_delivered_customer_date",
+            "order_delivered_carrier_date",
+            "order_estimated_delivery_date"
         ]
     },
 
@@ -33,7 +36,13 @@ SCHEMA_REGISTRY = {
         "columns": [
             "product_id",
             "product_category_name",
-            "product_weight_g"
+            "product_weight_g",
+            "product_name_lenght",
+            "product_description_lenght",
+            "product_photos_qty",
+            "product_length_cm",
+            "product_height_cm",
+            "product_width_cm"
         ]
     },
 
@@ -43,7 +52,9 @@ SCHEMA_REGISTRY = {
         "columns": [
             "seller_id",
             "seller_city",
-            "seller_state"
+            "seller_state",
+            "seller_zip_code_prefix",
+
         ]
     },
 
@@ -55,7 +66,8 @@ SCHEMA_REGISTRY = {
             "product_id",
             "seller_id",
             "price",
-            "freight_value"
+            "freight_value",
+            "shipping_limit_date"
         ]
     },
 
@@ -65,7 +77,8 @@ SCHEMA_REGISTRY = {
             "order_id",
             "payment_type",
             "payment_installments",
-            "payment_value"
+            "payment_value",
+            "payment_sequential"
         ]
     },
 
@@ -74,7 +87,11 @@ SCHEMA_REGISTRY = {
         "columns": [
             "review_id",
             "order_id",
-            "review_score"
+            "review_score",
+            "review_comment_title",
+            "review_comment_message",
+            "review_creation_date",
+            "review_answer_timestamp"
         ]
     },
 

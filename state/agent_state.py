@@ -20,3 +20,5 @@ class AgentState(TypedDict):
     query_result: Optional[list]
 
     formatted_response: Optional[str]
+
+    sql_validation: dict
