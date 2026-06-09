@@ -1,0 +1,180 @@
+{
+    "category_translation": {
+        "description": "",
+        "primary_key": "product_category_name",
+        "foreign_keys": {},
+        "columns": [
+            "product_category_name",
+            "product_category_name_english"
+        ],
+        "column_types": {
+            "product_category_name": "text",
+            "product_category_name_english": "text"
+        }
+    },
+    "customers": {
+        "description": "",
+        "primary_key": "customer_id",
+        "foreign_keys": {},
+        "columns": [
+            "customer_id",
+            "customer_unique_id",
+            "customer_zip_code_prefix",
+            "customer_city",
+            "customer_state"
+        ],
+        "column_types": {
+            "customer_id": "text",
+            "customer_unique_id": "text",
+            "customer_zip_code_prefix": "integer",
+            "customer_city": "text",
+            "customer_state": "text"
+        }
+    },
+    "order_items": {
+        "description": "",
+        "primary_key": "order_id",
+        "foreign_keys": {
+            "order_id": "orders.order_id",
+            "product_id": "products.product_id",
+            "seller_id": "sellers.seller_id"
+        },
+        "columns": [
+            "order_id",
+            "order_item_id",
+            "product_id",
+            "seller_id",
+            "shipping_limit_date",
+            "price",
+            "freight_value"
+        ],
+        "column_types": {
+            "order_id": "text",
+            "order_item_id": "integer",
+            "product_id": "text",
+            "seller_id": "text",
+            "shipping_limit_date": "timestamp without time zone",
+            "price": "numeric",
+            "freight_value": "numeric"
+        }
+    },
+    "order_payments": {
+        "description": "",
+        "primary_key": "order_id",
+        "foreign_keys": {
+            "order_id": "orders.order_id"
+        },
+        "columns": [
+            "order_id",
+            "payment_sequential",
+            "payment_type",
+            "payment_installments",
+            "payment_value"
+        ],
+        "column_types": {
+            "order_id": "text",
+            "payment_sequential": "integer",
+            "payment_type": "text",
+            "payment_installments": "integer",
+            "payment_value": "numeric"
+        }
+    },
+    "order_reviews": {
+        "description": "",
+        "primary_key": null,
+        "foreign_keys": {
+            "order_id": "orders.order_id"
+        },
+        "columns": [
+            "review_id",
+            "order_id",
+            "review_score",
+            "review_comment_title",
+            "review_comment_message",
+            "review_creation_date",
+            "review_answer_timestamp"
+        ],
+        "column_types": {
+            "review_id": "text",
+            "order_id": "text",
+            "review_score": "integer",
+            "review_comment_title": "text",
+            "review_comment_message": "text",
+            "review_creation_date": "timestamp without time zone",
+            "review_answer_timestamp": "timestamp without time zone"
+        }
+    },
+    "orders": {
+        "description": "",
+        "primary_key": "order_id",
+        "foreign_keys": {
+            "customer_id": "customers.customer_id"
+        },
+        "columns": [
+            "order_id",
+            "customer_id",
+            "order_status",
+            "order_purchase_timestamp",
+            "order_approved_at",
+            "order_delivered_carrier_date",
+            "order_delivered_customer_date",
+            "order_estimated_delivery_date"
+        ],
+        "column_types": {
+            "order_id": "text",
+            "customer_id": "text",
+            "order_status": "text",
+            "order_purchase_timestamp": "timestamp without time zone",
+            "order_approved_at": "timestamp without time zone",
+            "order_delivered_carrier_date": "timestamp without time zone",
+            "order_delivered_customer_date": "timestamp without time zone",
+            "order_estimated_delivery_date": "timestamp without time zone"
+        }
+    },
+    "products": {
+        "description": "",
+        "primary_key": "product_id",
+        "foreign_keys": {
+            "product_category_name": "category_translation.product_category_name"
+        },
+        "columns": [
+            "product_id",
+            "product_category_name",
+            "product_name_lenght",
+            "product_description_lenght",
+            "product_photos_qty",
+            "product_weight_g",
+            "product_length_cm",
+            "product_height_cm",
+            "product_width_cm"
+        ],
+        "column_types": {
+            "product_id": "text",
+            "product_category_name": "text",
+            "product_name_lenght": "integer",
+            "product_description_lenght": "integer",
+            "product_photos_qty": "integer",
+            "product_weight_g": "integer",
+            "product_length_cm": "integer",
+            "product_height_cm": "integer",
+            "product_width_cm": "integer"
+        }
+    },
+    "sellers": {
+        "description": "",
+        "primary_key": "seller_id",
+        "foreign_keys": {},
+        "columns": [
+            "seller_id",
+            "seller_zip_code_prefix",
+            "seller_city",
+            "seller_state"
+        ],
+        "column_types": {
+            "seller_id": "text",
+            "seller_zip_code_prefix": "integer",
+            "seller_city": "text",
+            "seller_state": "text"
+        }
+    }
+}

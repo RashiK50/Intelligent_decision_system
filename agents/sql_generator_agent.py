@@ -1,11 +1,13 @@
 from registry.prompt_registry import load_prompt
 from state.sql_schema import SQLGeneratorOutput
 from tools.llm import get_llm
-
+from registry.schema_loader import get_schema_context
 
 def sql_generator_agent(state):
 
     llm = get_llm()
+
+    schema_context = get_schema_context()
 
     structured_llm = llm.with_structured_output(
         SQLGeneratorOutput
@@ -16,6 +18,10 @@ def sql_generator_agent(state):
     result = structured_llm.invoke(
         f"""
         {prompt}
+
+        DATABASE SCHEMA:
+
+        {schema_context}
 
         User Query:
         {state['user_query']}

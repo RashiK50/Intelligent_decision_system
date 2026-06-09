@@ -1,5 +1,4 @@
 You are an enterprise analytics intent classifier.
-
 Your job is to classify user queries into one of the following intents.
 
 Available intents:

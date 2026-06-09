@@ -1,6 +1,5 @@
 from agents.planner_agent import planner_agent
 
-
 state = {
     "user_query": "What are the top selling products?",
     "intent": "product_analysis",
