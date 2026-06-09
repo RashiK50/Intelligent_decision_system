@@ -105,6 +105,3 @@ utils/
 * LLM-Based Guardrails
 * KPI Dashboards
 
-## Resume Summary
-
-Built a Multi-Agent Enterprise Decision Intelligence Platform using LangGraph, FastAPI, Gemini, PostgreSQL, and Supabase with schema-aware planning, text-to-SQL generation, SQL validation, and business insight generation.
