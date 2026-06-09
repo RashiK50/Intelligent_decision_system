@@ -6,8 +6,14 @@ from agents.sql_validator_agent import sql_validator_agent
 from agents.database_executor_agent import database_executor_agent
 from agents.output_agent import output_agent
 from state.agent_state import AgentState
+from agents.guardrail_agent import guardrail_agent
 
 builder = StateGraph(AgentState)
+
+builder.add_node(
+    "guardrail",
+    guardrail_agent
+)
 
 builder.add_node(
     "intent",
@@ -39,8 +45,12 @@ builder.add_node(
     output_agent
 )
 
-
 builder.set_entry_point(
+    "guardrail"
+)
+
+builder.add_edge(
+    "guardrail",
     "intent"
 )
 

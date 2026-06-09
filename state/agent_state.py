@@ -22,3 +22,7 @@ class AgentState(TypedDict):
     formatted_response: Optional[str]
 
     sql_validation: dict
+
+    is_allowed: bool | None = None
+
+    guardrail_reason: str | None = None
