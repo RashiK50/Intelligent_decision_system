@@ -1,4 +1,4 @@
-from registry.prompt_registry import load_prompt
+from registry.prompt_registry import get_prompt
 from state.planner_schema import PlannerOutput
 from tools.llm import get_llm
 from registry.schema_loader import get_schema_context
@@ -13,7 +13,7 @@ def planner_agent(state):
         PlannerOutput
     )
 
-    prompt = load_prompt("planner")
+    prompt = get_prompt("planner")
     
     result = structured_llm.invoke(
         f"""

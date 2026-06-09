@@ -1,4 +1,4 @@
-from registry.prompt_registry import load_prompt
+from registry.prompt_registry import get_prompt
 from state.sql_schema import SQLGeneratorOutput
 from tools.llm import get_llm
 from registry.schema_loader import get_schema_context
@@ -13,7 +13,7 @@ def sql_generator_agent(state):
         SQLGeneratorOutput
     )
 
-    prompt = load_prompt("sql_generator")
+    prompt = get_prompt("sql_generator")
 
     result = structured_llm.invoke(
         f"""

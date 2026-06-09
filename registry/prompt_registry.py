@@ -1,10 +1,19 @@
-from pathlib import Path
-
-PROMPTS_DIR = Path("prompts")
+import json
 
 
-def load_prompt(prompt_name: str) -> str:
-    prompt_path = PROMPTS_DIR / f"{prompt_name}.txt"
+with open(
+    "prompts/prompts.json",
+    "r",
+    encoding="utf-8"
+) as f:
 
-    with open(prompt_path, "r", encoding="utf-8") as file:
-        return file.read()
+    PROMPTS = json.load(f)
+
+
+def get_prompt(prompt_name: str):
+
+    prompt_data = PROMPTS[prompt_name]
+
+    active_version = prompt_data["active_version"]
+
+    return prompt_data["versions"][active_version]

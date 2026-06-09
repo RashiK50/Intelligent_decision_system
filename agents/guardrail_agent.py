@@ -1,4 +1,4 @@
-from registry.prompt_registry import load_prompt
+from registry.prompt_registry import get_prompt
 from state.agent_state import AgentState
 
 

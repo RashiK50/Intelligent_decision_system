@@ -1,4 +1,4 @@
-from registry.prompt_registry import load_prompt
+from registry.prompt_registry import get_prompt
 from state.sql_validator_schema import SQLValidatorOutput
 from tools.llm import get_llm
 
@@ -11,7 +11,7 @@ def sql_validator_agent(state):
         SQLValidatorOutput
     )
 
-    prompt = load_prompt("sql_validator")
+    prompt = get_prompt("sql_validator")
 
     result = structured_llm.invoke(
         f"""

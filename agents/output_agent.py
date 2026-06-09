@@ -1,4 +1,4 @@
-from registry.prompt_registry import load_prompt
+from registry.prompt_registry import get_prompt
 from state.output_schema import OutputAgentResponse
 from tools.llm import get_llm
 
@@ -10,7 +10,7 @@ def output_agent(state):
         OutputAgentResponse
     )
 
-    prompt = load_prompt("output")
+    prompt = get_prompt("output")
 
     result = structured_llm.invoke(
         f"""
