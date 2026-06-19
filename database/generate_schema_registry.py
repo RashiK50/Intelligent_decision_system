@@ -111,6 +111,23 @@ for table in tables:
             f"{ref_table}.{ref_col}"
         )
 
+
+    # ==========================================
+    # SAMPLE DATA (1 ROW FOR LLM CONTEXT)
+    # ==========================================
+
+    cur.execute(f"SELECT * FROM public.{table} LIMIT 1;")
+    sample_row = cur.fetchone()
+    
+    column_examples = {}
+    if sample_row:
+        # Extract column names from the cursor description
+        col_names = [desc[0] for desc in cur.description]
+        
+        # Map column names to their sample values, cast to string for JSON safety
+        for col_name, val in zip(col_names, sample_row):
+            column_examples[col_name] = str(val) if val is not None else "None"
+
     # ==========================================
     # BUILD REGISTRY
     # ==========================================
@@ -125,7 +142,9 @@ for table in tables:
 
         "columns": columns,
 
-        "column_types": column_types
+        "column_types": column_types,
+
+        "column_examples": column_examples
     }
 
 # ==========================================

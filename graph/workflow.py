@@ -5,10 +5,47 @@ from agents.sql_generator_agent import sql_generator_agent
 from agents.sql_validator_agent import sql_validator_agent
 from agents.database_executor_agent import database_executor_agent
 from agents.output_agent import output_agent
-from state.agent_state import AgentState
+from state import PlatformState
 from agents.guardrail_agent import guardrail_agent
+from agents.orchestrator_agent import orchestrator_agent
 
-builder = StateGraph(AgentState)
+def route_after_guardrail(state: PlatformState) -> str:
+    """Routes to intent agent if allowed, otherwise skips directly to output."""
+    if state.get("is_allowed") is True:
+        return "intent"
+    return "output"
+
+def route_after_validation(state: PlatformState) -> str:
+    """Loops back to generator if SQL is invalid, unless max retries reached."""
+    validation_data = state.get("sql_validation", {})
+    is_valid = validation_data.get("is_valid", False)
+    retry_count = state.get("sql_retry_count", 0)
+    
+    if is_valid:
+        return "database_executor"
+    
+    # Fallback/Self-healing Loop constraint to prevent infinite API calling
+    if retry_count >= 3:
+        return "output" # Go to output to print failure details safely
+        
+    return "sql_generator"
+
+builder = StateGraph(PlatformState)
+
+def route_after_orchestrator(state: PlatformState) -> str:
+    """
+    Reads the workflow_type decided by the Orchestrator and routes accordingly.
+    """
+    workflow_type = state.get("workflow")
+    
+    if workflow_type == "parallel_planners":
+        print(" [ROUTER] Parallel planners selected (Defaulting to single planner for MVP)")
+        return "planner"
+    elif workflow_type == "sequential_planners":
+        print(" [ROUTER] Sequential planners selected (Defaulting to single planner for MVP)")
+        return "planner"
+    else:
+        return "planner"
 
 builder.add_node(
     "guardrail",
@@ -18,6 +55,11 @@ builder.add_node(
 builder.add_node(
     "intent",
     intent_agent
+)
+
+builder.add_node(
+    "orchestrator",
+    orchestrator_agent
 )
 
 builder.add_node(
@@ -49,14 +91,27 @@ builder.set_entry_point(
     "guardrail"
 )
 
-builder.add_edge(
+builder.add_conditional_edges(
     "guardrail",
-    "intent"
+    route_after_guardrail,
+    {
+        "intent": "intent",
+        "output": "output"
+    }
 )
 
 builder.add_edge(
     "intent",
-    "planner"
+    "orchestrator"
+)
+
+builder.add_conditional_edges(
+    "orchestrator",
+    route_after_orchestrator,
+    {
+        "planner": "planner"
+        # "parallel_planner": "parallel_planner" # Future scope
+    }
 )
 
 builder.add_edge(
@@ -69,9 +124,14 @@ builder.add_edge(
     "sql_validator"
 )
 
-builder.add_edge(
+builder.add_conditional_edges(
     "sql_validator",
-    "database_executor"
+    route_after_validation,
+    {
+        "database_executor": "database_executor",
+        "sql_generator": "sql_generator",
+        "output": "output"
+    }
 )
 
 builder.add_edge(
