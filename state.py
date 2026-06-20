@@ -52,6 +52,9 @@ class PlatformState(TypedDict):
     sql_query: Optional[str]
     sql_validation: Dict[str, Any]
     sql_retry_count: int  # Keeps track of how many self-healing loops have executed
+    raw_db_result: Optional[List[dict[str, Any]]]
+    execution_status: Optional[str]
+    error_message: Optional[str]
     
     # Raw Results & Delivery
     query_result: Optional[List[Dict[str, Any]]]

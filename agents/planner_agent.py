@@ -94,12 +94,32 @@ def planner_agent(state: PlatformState) -> dict:
     # Extract the directive passed down by the Orchestrator
     plan_state = state.get("plan", {})
     directive = plan_state.get("directive", "Generate a plan based on the intent and schema.")
+
+    # ==========================================
+    # 🛑 NEW: Check for sqlglot Validation Errors
+    # ==========================================
+    validation_data = state.get("sql_validation", {})
+    validation_issues = validation_data.get("issues")
+    is_valid = validation_data.get("is_valid", True) # Defaults to True on first pass
     
+    error_injection = ""
+    if not is_valid and validation_issues:
+        print(f"⚠️ [PLANNER NODE] Triggered for self-correction. Issue: {validation_issues}")
+        error_injection = (
+            f"\n\n[SYSTEM ALERT: PREVIOUS EXECUTION FAILED]\n"
+            f"The SQL generated from your previous plan triggered the following parser error:\n"
+            f"{validation_issues}\n"
+            f"Please revise your execution plan (tables, columns, filters, or joins) to resolve this issue."
+        )
+    
+    # Combine the original query with the error injection
+    final_query = user_query + error_injection
+
     prompt_template_str = get_prompt("planner")
     prompt = PromptTemplate.from_template(prompt_template_str)
     
     formatted_prompt = prompt.format(
-        user_query=user_query,
+        user_query=final_query,
         directive=directive,
         entities=json.dumps(entities),
         schema_context=schema_context
@@ -126,8 +146,14 @@ def planner_agent(state: PlatformState) -> dict:
             "blueprint": result.model_dump()
         }
 
+        current_retry_count = state.get("sql_retry_count", 0)
+        
+        # If the planner was triggered by a validation failure (!is_valid), increment by 1
+        new_retry_count = current_retry_count + 1 if not is_valid else current_retry_count
+
         return {
-            "plan": updated_plan
+            "plan": updated_plan,
+            "sql_retry_count": new_retry_count
         }
         
     except Exception as e:

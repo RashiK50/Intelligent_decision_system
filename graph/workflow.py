@@ -28,7 +28,7 @@ def route_after_validation(state: PlatformState) -> str:
     if retry_count >= 3:
         return "output" # Go to output to print failure details safely
         
-    return "sql_generator"
+    return "planner"
 
 builder = StateGraph(PlatformState)
 
