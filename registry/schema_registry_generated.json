@@ -32,7 +32,7 @@
         }
     },
     "order_items": {
-        "description": "",
+        "description": "Crucial for all revenue and sales calculations. Contains the actual 'price' column. Join with orders to calculate top sellers.",
         "primary_key": "order_id",
         "foreign_keys": {
             "order_id": "orders.order_id",
@@ -59,7 +59,7 @@
         }
     },
     "order_payments": {
-        "description": "",
+        "description": "Contains payment information for each order, including payment type and value.",
         "primary_key": "order_id",
         "foreign_keys": {
             "order_id": "orders.order_id"
@@ -105,7 +105,7 @@
         }
     },
     "orders": {
-        "description": "",
+        "description": "Contains order statuses and timestamps. Does not contain pricing data. Pricing data is in the order_items table.",
         "primary_key": "order_id",
         "foreign_keys": {
             "customer_id": "customers.customer_id"
@@ -132,7 +132,7 @@
         }
     },
     "products": {
-        "description": "",
+        "description": "Contains product categories and IDs. There is NO product_name column. You MUST use product_category_name or product_id instead.",
         "primary_key": "product_id",
         "foreign_keys": {
             "product_category_name": "category_translation.product_category_name"

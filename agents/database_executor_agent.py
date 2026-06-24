@@ -10,9 +10,9 @@ async def database_executor_agent(state: PlatformState) -> dict:
     print(" [DATABASE EXECUTOR NODE] Firing Query...")
     print("==================================================")
     
-    query = state.get("sql_query")
+    sql_query = state.get("sql_query")
     
-    if not query:
+    if not sql_query:
         print("❌ [DATABASE EXECUTOR NODE] Error: No SQL query found in state.")
         return {
             "execution_status": "failed",
@@ -21,14 +21,14 @@ async def database_executor_agent(state: PlatformState) -> dict:
     
     try:
         # Await the async database network call
-        results = await execute_read_query(query)
+        raw_data = await execute_read_query(sql_query)
         
-        print(f"✅ [DATABASE EXECUTOR NODE] Query executed successfully. Retrieved {len(results)} rows.")
+        print(f"✅ [DATABASE EXECUTOR NODE] Query executed successfully. Retrieved {len(raw_data)} rows.")
         print("--------------------------------------------------")
         
         # Output stored directly in the state variable you requested
         return {
-            "raw_db_result": results,
+            "raw_db_result": raw_data,
             "execution_status": "success",
             "error_message": None
         }

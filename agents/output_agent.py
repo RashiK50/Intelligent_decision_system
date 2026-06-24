@@ -4,7 +4,7 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from state import PlatformState
 # Assuming you have your prompt loader utility
-from utils.prompt_manager import get_prompt 
+from registry.prompt_registry import get_prompt 
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)

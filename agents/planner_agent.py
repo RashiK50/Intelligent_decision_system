@@ -115,20 +115,32 @@ def planner_agent(state: PlatformState) -> dict:
     # Combine the original query with the error injection
     final_query = user_query + error_injection
 
+    # 1. Check if we are in a retry loop and grab the SQL errors
+    validation_state = state.get("sql_validation", {})
+    issues = validation_state.get("issues")
+    
+    # 2. Create the injection string (or leave it blank if it's the first run)
+    error_injection_str = f"PREVIOUS SQL FAILED WITH THIS ERROR:\n{issues}\nFix your plan to avoid this error." if issues else ""
+
     prompt_template_str = get_prompt("planner")
     prompt = PromptTemplate.from_template(prompt_template_str)
     
+    # 3. Pass the error_injection variable to the prompt formatter
     formatted_prompt = prompt.format(
-        user_query=final_query,
+        user_query=user_query,
         directive=directive,
         entities=json.dumps(entities),
-        schema_context=schema_context
+        schema_context=schema_context,
+        error_injection=error_injection_str  # <--- This fixes the crash!
     )
     
     try:
         # 🛑 POSITION 2: API Call
         print(" [PLANNER NODE] Analyzing schema and drafting query blueprint...")
         result: PlannerOutput = invoke_planner_llm(formatted_prompt)
+
+        print("\nPLANNER OUTPUT")
+        print(result)
         
         # 🛑 POSITION 3: Success Checkpoint
         print("--------------------------------------------------")
@@ -162,3 +174,4 @@ def planner_agent(state: PlatformState) -> dict:
         print(f"❌ Exception Details: {str(e)}")
         print("--------------------------------------------------")
         raise e
+

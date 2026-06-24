@@ -76,7 +76,7 @@ def invoke_guardrail_llm(formatted_prompt: str) -> GuardrailOutput:
 # ==========================================
 # 5. LangGraph Node implementation
 # ==========================================
-def guardrail_node(state: PlatformState) -> dict:
+def guardrail_agent(state: PlatformState) -> dict:
 
     print("\n==================================================")
     print(" [GUARDRAIL NODE] Starting execution...")
@@ -112,7 +112,7 @@ def guardrail_node(state: PlatformState) -> dict:
         print(" [GUARDRAIL NODE] Groq Response Received Successfully:")
         print(f"   - Classification: {result.classification}")
         print(f"   - Is Allowed:      {result.is_allowed}")
-        print(f"   - Reject Reason:   {result.guardrail_reason}")
+        print(f"   - Reason:   {result.guardrail_reason}")
         print("--------------------------------------------------")
 
         logger.info(f"Guardrail decision: {result.classification} | Allowed: {result.is_allowed}")

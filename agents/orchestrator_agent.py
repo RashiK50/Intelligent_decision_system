@@ -11,7 +11,7 @@ from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_excep
 # Centralized State and Registries
 from state import PlatformState
 from database.schema_registry import schema_registry
-from registry.tool_registry import tool_registry
+from registry.tool_registry import get_tools_for_intent
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -103,7 +103,7 @@ def orchestrator_agent(state: PlatformState) -> dict:
     available_tables = "\n".join([f"- {name}: {info.get('description', '')}" for name, info in schema_registry.tables.items()])
     
     # Get relevant tools based on intent
-    available_tools = tool_registry.get_all_tool_schemas_for_llm(intent)
+    available_tools = get_tools_for_intent(intent)
     
     prompt_template_str = get_prompt("orchestrator")
     prompt = PromptTemplate.from_template(prompt_template_str)
