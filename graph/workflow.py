@@ -119,9 +119,30 @@ builder.add_edge(
     "sql_generator"
 )
 
-builder.add_edge(
+def route_after_generation(state: PlatformState) -> str:
+    """If SQL Generator failed to compile (empty query / is_valid False),
+    skip the Validator entirely and route straight into the same
+    retry/output logic used after validation failures."""
+    validation_data = state.get("sql_validation", {})
+    is_valid = validation_data.get("is_valid", False)
+    sql_query = state.get("sql_query", "")
+
+    if is_valid and sql_query:
+        return "sql_validator"
+
+    retry_count = state.get("sql_retry_count", 0)
+    if retry_count >= 3:
+        return "output"
+    return "planner"
+
+builder.add_conditional_edges(
     "sql_generator",
-    "sql_validator"
+    route_after_generation,
+    {
+        "sql_validator": "sql_validator",
+        "planner": "planner",
+        "output": "output"
+    }
 )
 
 builder.add_conditional_edges(
@@ -129,7 +150,7 @@ builder.add_conditional_edges(
     route_after_validation,
     {
         "database_executor": "database_executor",
-        "sql_generator": "sql_generator",
+        "planner": "planner",
         "output": "output"
     }
 )
@@ -144,4 +165,6 @@ builder.add_edge(
     END
 )
 
-graph = builder.compile()
+from langgraph.checkpoint.memory import MemorySaver
+memory = MemorySaver()
+graph = builder.compile(checkpointer=memory)

@@ -39,12 +39,81 @@ def sql_generator_agent(state: PlatformState) -> dict:
         if not select_items:
             select_items.append(literal_column("*"))
 
+        # 2b. Validate: if the query has any aggregate function in SELECT,
+        # every plain (non-aggregated) metric column must appear in GROUP BY.
+        # If there is NO group_by at all, then NO plain metric columns are allowed
+        # alongside an aggregate — the whole SELECT must reduce to a single row.
+        # Postgres enforces this at execution time; we catch it here so the
+        # error routes back to the Planner immediately instead of round-tripping to the DB.
+        group_by_cols = blueprint.get("group_by", [])
+        aggregations = blueprint.get("aggregations", [])
+        metrics = blueprint.get("metrics", [])
+
+        if aggregations:
+            group_by_set = set(group_by_cols)
+            for metric in metrics:
+                if metric not in group_by_set:
+                    raise ValueError(
+                        f"Column '{metric}' is selected alongside an aggregate function "
+                        f"({aggregations}) but is not in GROUP BY. "
+                        f"Either remove '{metric}' from metrics, add it to group_by, "
+                        f"or wrap it in an aggregate."
+                    )
+
         # Initialize the SQLAlchemy Select object
         query = select(*select_items)
 
-        # 3. Add FROM clauses (Implicit cross-joins, resolved by WHERE conditions)
-        for t in tables:
-            query = query.select_from(t)
+        # 3. Add FROM / JOIN clauses
+        join_conditions = blueprint.get("joins", [])
+
+        if not join_conditions:
+            # No joins specified: fall back to plain FROM (single table, or
+            # caller accepts an implicit cross join risk for multi-table).
+            for t in tables:
+                query = query.select_from(t)
+        else:
+            # Build explicit JOIN ... ON clauses from the Planner's blueprint.
+            joined_table_names = set()
+
+            # Start from the first join's left table as the anchor
+            first_join = join_conditions[0]
+            base_table = table(first_join["left_table"])
+            query = query.select_from(base_table)
+            joined_table_names.add(first_join["left_table"])
+
+            for jc in join_conditions:
+                left_table_name = jc["left_table"]
+                right_table_name = jc["right_table"]
+                # Defensive: LLM sometimes returns fully-qualified columns
+                # (e.g. "order_items.customer_id") even when asked for unqualified.
+                # Strip any table prefix so we don't double-qualify downstream.
+                left_col = jc["left_column"].split(".")[-1]
+                right_col = jc["right_column"].split(".")[-1]
+                join_type = jc.get("join_type", "INNER").upper()
+
+                right_table_obj = table(right_table_name)
+                on_clause = text(f"{left_table_name}.{left_col} = {right_table_name}.{right_col}")
+
+                isouter = join_type in ("LEFT", "FULL")
+                full = join_type == "FULL"
+
+                query = query.join(
+                    right_table_obj,
+                    onclause=on_clause,
+                    isouter=isouter,
+                    full=full,
+                )
+                joined_table_names.add(right_table_name)
+
+            # Safety net: any table mentioned in `tables` but never referenced
+            # by a join condition gets appended as a cross join (and a warning),
+            # rather than silently disappearing from the query.
+            missing_tables = set(table_names) - joined_table_names
+            if missing_tables:
+                print(f"⚠️ [SQL GENERATOR NODE] Tables {missing_tables} not connected via any join condition.")
+                for t in tables:
+                    if t.name in missing_tables:
+                        query = query.select_from(t)
 
         # 4. WHERE Clauses (Filters & Implicit Joins)
         filters = blueprint.get("filters", [])

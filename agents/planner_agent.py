@@ -1,7 +1,7 @@
 import json
 import logging
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import List, Optional, Union
+from pydantic import BaseModel, Field, field_validator
 
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
@@ -24,15 +24,37 @@ class FilterCondition(BaseModel):
     operator: str = Field(description="The SQL operator (e.g., '=', '>', '<=', 'ILIKE', 'IN').")
     value: str = Field(description="The value to filter by, formatted for SQL (e.g., '100', \"'Electronics'\", \"'2026-01-01'\").")
 
+class JoinCondition(BaseModel):
+    left_table: str = Field(description="The first table in the join (e.g., 'order_items').")
+    left_column: str = Field(description="The join column on the left table, unqualified (e.g., 'product_id').")
+    right_table: str = Field(description="The second table in the join (e.g., 'products').")
+    right_column: str = Field(description="The join column on the right table, unqualified (e.g., 'product_id').")
+    join_type: str = Field(default="INNER", description="JOIN type: INNER, LEFT, RIGHT, or FULL. Default INNER.")
+
 class PlannerOutput(BaseModel):
     tables: List[str] = Field(description="List of tables that need to be joined or queried.")
+    joins: List[JoinCondition] = Field(default_factory=list, description="Explicit join keys connecting the tables")
     metrics: List[str] = Field(description="The columns or aliases to SELECT.")
     aggregations: List[str] = Field(description="Mathematical operations needed (e.g., 'SUM(total_price)', 'COUNT(DISTINCT user_id)').")
     filters: List[FilterCondition] = Field(description="Precise conditions for the WHERE clause.")
     group_by: List[str] = Field(description="Columns to use in the GROUP BY clause.")
     sort_by: Optional[str] = Field(None, description="ORDER BY logic (e.g., 'total_revenue DESC').")
-    limit: Optional[int] = Field(None, description="Number of rows to limit.")
+    limit: Optional[Union[int, str]] = Field(None, description="Number of rows to limit.")
     reasoning: str = Field(description="Step-by-step logic explaining why these tables, joins, and filters were chosen.")
+
+    @field_validator("limit", mode="before")
+    @classmethod
+    def coerce_limit_to_int(cls, v):
+        """Groq's tool-calling occasionally returns numeric fields as strings (e.g. '10' instead of 10).
+        Coerce here rather than failing validation outright."""
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            try:
+                return int(v)
+            except ValueError:
+                return None
+        return v
 
 # ==========================================
 # 2. Helper: Centralized Prompt Loader
@@ -174,4 +196,3 @@ def planner_agent(state: PlatformState) -> dict:
         print(f"❌ Exception Details: {str(e)}")
         print("--------------------------------------------------")
         raise e
-

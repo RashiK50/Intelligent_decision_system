@@ -15,8 +15,16 @@ class IntentStateOutput(BaseModel):
     sub_intent: str = Field(description="Specific sub-category category")
     entities: Dict[str, Any] = Field(default_factory=dict, description="Extracted filter entities like dates, product IDs")
 
+class JoinConditionOutput(BaseModel):
+    left_table: str = Field(description="Left-hand table in the join")
+    left_column: str = Field(description="Join column on the left table")
+    right_table: str = Field(description="Right-hand table in the join")
+    right_column: str = Field(description="Join column on the right table")
+    join_type: str = Field(default="INNER", description="JOIN type: INNER, LEFT, RIGHT, FULL")
+
 class PlannerStateOutput(BaseModel):
     tables: List[str] = Field(description="Tables required to satisfy the request")
+    joins: List[JoinConditionOutput] = Field(default_factory=list, description="Explicit join keys connecting the tables")
     metrics: List[str] = Field(description="Calculations or KPIs requested")
     filters: List[Dict[str, Any]] = Field(description="SQL WHERE conditions mapped out")
     reasoning: str = Field(description="Step-by-step logic detailing how to structure the data approach")

@@ -29,37 +29,40 @@ class SchemaRegistry:
             logger.error(f"Failed to load schema registry: {e}")
 
     def get_formatted_menu_for_intent(self, requested_tables: List[str] = None) -> str:
-        """
-        Converts the requested tables (or all tables if none specified) into a 
-        token-efficient, highly readable string menu to inject into the LLM context prompt.
-        """
+        """Converts the requested tables (or all tables if none specified) into a token-efficient, highly readable string menu to inject into the LLM context prompt."""
         if not self.tables:
             return "Error: Database schema is currently unavailable."
 
-        # If no specific tables requested, default to all available
         tables_to_format = requested_tables if requested_tables else list(self.tables.keys())
-        
+
         menu_lines = []
         for table_name in tables_to_format:
             table = self.tables.get(table_name)
             if not table:
                 continue
-                
-            menu_lines.append(f"TABLE: {table.get('table_name')}")
-            menu_lines.append(f"DESCRIPTION: {table.get('description', 'No description available.')}")
+
+            column_types = table.get("column_types", {})
+
+            menu_lines.append(f"TABLE: {table_name}")
+            menu_lines.append(f"DESCRIPTION: {table.get('description') or 'No description available.'}")
+
+            primary_key = table.get("primary_key")
+            if primary_key:
+                menu_lines.append(f"PRIMARY KEY: {primary_key}")
+
             menu_lines.append("COLUMNS:")
-            
-            for col in table.get("columns", []):
-                # Format: - column_name (type): description [Example: data]
-                name = col.get("name")
-                dtype = col.get("data_type")
-                desc = col.get("description", "")
-                example = col.get("example", "")
-                
-                menu_lines.append(f"  - {name} ({dtype}): {desc} [Example: {example}]")
-                
-            menu_lines.append("") # Spacing between tables
-            
+            for col_name in table.get("columns", []):
+                dtype = column_types.get(col_name, "unknown")
+                menu_lines.append(f"  - {col_name} ({dtype})")
+
+            foreign_keys = table.get("foreign_keys", {})
+            if foreign_keys:
+                menu_lines.append("FOREIGN KEYS (use these exact join paths, do not invent others):")
+                for local_col, target in foreign_keys.items():
+                    menu_lines.append(f"  - {table_name}.{local_col} -> {target}")
+
+            menu_lines.append("")  # Spacing between tables
+
         return "\n".join(menu_lines)
 
 # Create a global instance that can be imported by your agents

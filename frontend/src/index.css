@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@theme {
+  --font-size-xs: 16px;   /* 12px -> 16px */
+  --font-size-sm: 18px;   /* 14px -> 18px */
+  --font-size-base: 20px; /* 16px -> 20px */
+  --font-size-lg: 22px;   /* 18px -> 22px */
+  --font-size-xl: 24px;   /* 20px -> 24px */
+  --font-size-2xl: 28px;  /* 24px -> 28px */
+  --font-size-3xl: 34px;  /* 30px -> 34px */
+  --font-size-4xl: 40px;  /* 36px -> 40px */
+}
+
+@layer base {
+  body {
+    @apply bg-[#0b0f19] text-[#e2e8f0] font-sans antialiased;
+  }
+  
+  /* Scrollbars styling for webkit */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(99, 102, 241, 0.1);
+    border-radius: 9999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.3);
+  }
+}
+
+@layer utilities {
+  .glass-card {
+    background: rgba(15, 23, 42, 0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+  
+  .glass-card-hover:hover {
+    border-color: rgba(99, 102, 241, 0.2);
+    box-shadow: 0 0 25px rgba(99, 102, 241, 0.05);
+  }
+  
+  .glass-panel {
+    background: rgba(11, 15, 25, 0.85);
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    border-right: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  
+  .glow-border {
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.1);
+  }
+
+  .font-display {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+/* Custom Markdown styling */
+.prose-custom {
+  @apply text-[#cbd5e1] leading-relaxed text-lg;
+}
+
+.prose-custom p {
+  @apply mb-4 last:mb-0;
+}
+
+.prose-custom ul, .prose-custom ol {
+  @apply mb-4 pl-5 space-y-1.5;
+}
+
+.prose-custom ul {
+  @apply list-disc marker:text-indigo-400;
+}
+
+.prose-custom ol {
+  @apply list-decimal marker:text-indigo-400;
+}
+
+.prose-custom strong {
+  @apply font-semibold text-white;
+}
+
+.prose-custom code:not(pre code) {
+  @apply bg-slate-900/90 text-indigo-300 px-1.5 py-0.5 rounded text-base border border-slate-800/80 font-mono font-normal;
+}
+
+.prose-custom pre {
+  @apply bg-[#0f1423]/95 p-4 rounded-xl border border-slate-800/80 overflow-x-auto my-4 font-mono text-base relative;
+}
+
+.prose-custom pre code {
+  @apply text-slate-300 block leading-normal;
+}
+
+/* Beautiful enterprise table styling */
+.prose-custom table {
+  @apply w-full border-collapse border-spacing-0 text-left my-5 rounded-xl overflow-hidden border border-slate-800/80 shadow-lg;
+}
+
+.prose-custom thead {
+  @apply bg-slate-900/95 text-slate-200 border-b border-slate-800 text-base font-semibold uppercase tracking-wider;
+}
+
+.prose-custom th {
+  @apply px-4 py-3.5 font-semibold;
+}
+
+.prose-custom tbody tr {
+  @apply border-b border-slate-800/60 last:border-b-0 hover:bg-slate-800/10 transition-colors duration-150;
+}
+
+.prose-custom tbody tr:nth-child(even) {
+  @apply bg-slate-900/30;
+}
+
+.prose-custom td {
+  @apply px-4 py-3 text-slate-300 text-base font-mono;
+}
