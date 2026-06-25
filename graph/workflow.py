@@ -36,15 +36,25 @@ def route_after_orchestrator(state: PlatformState) -> str:
     """
     Reads the workflow_type decided by the Orchestrator and routes accordingly.
     """
-    workflow_type = state.get("workflow")
+    # Grab the correct state variable (ensure this matches what your Orchestrator outputs)
+    workflow_type = state.get("workflow_type", state.get("workflow", "single_planner"))
     
-    if workflow_type == "parallel_planners":
+    print(f"\n [ROUTER] Orchestrator selected workflow: {workflow_type}")
+    
+    # 1. THE NEW TOOL ROUTE
+    if workflow_type == "tool_execution":
+        print(" [ROUTER] Routing to Python Tool Node...")
+        return "tool_node"  # <--- Note: Ensure your graph.add_node() uses this exact string!
+        
+    # 2. THE SQL PLANNER ROUTES
+    elif workflow_type == "parallel_planners":
         print(" [ROUTER] Parallel planners selected (Defaulting to single planner for MVP)")
         return "planner"
     elif workflow_type == "sequential_planners":
         print(" [ROUTER] Sequential planners selected (Defaulting to single planner for MVP)")
         return "planner"
     else:
+        print(" [ROUTER] Defaulting to single planner...")
         return "planner"
 
 builder.add_node(
