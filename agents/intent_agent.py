@@ -34,7 +34,11 @@ class IntentOutput(BaseModel):
     )
     entities: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Key-value pairs extracted for the query. Examples: {'product_id': '123'}, {'start_date': '2026-01-01'}, {'category': 'electronics'}, {'region': 'North'}."
+        description=(
+            "Key-value pairs extracted for the query. Examples: {'product_id': '123'}, {'start_date': '2026-01-01'}. "
+            "CRITICAL: If the query asks to calculate growth or compare numbers, you MUST extract the metric name and values like so: "
+            "{'metric': 'Revenue', 'current_value': 500, 'previous_value': 400}."
+        )
     )
     analytical_constraints: AnalyticalConstraints = Field(
         description="Structural or sorting limits requested by the user query."

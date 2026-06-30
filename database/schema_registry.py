@@ -67,3 +67,32 @@ class SchemaRegistry:
 
 # Create a global instance that can be imported by your agents
 schema_registry = SchemaRegistry()
+
+def get_schema_for_intent(intent: str) -> str:
+        """
+        Filters the loaded schema registry based on the classified intent.
+        This injects only relevant tables into the LLM context, saving tokens
+        and reducing the risk of hallucinated joins.
+        """
+        # If the registry didn't load properly, return an empty JSON object
+        if not schema_registry:
+            return "{}"
+
+        # Map your intents to the specific tables they need
+        intent_mapping = {
+            "sales_performance_analysis": ["orders", "order_items", "products", "customers", "sellers"],
+            "inventory_supply_analysis": ["products", "order_items"] 
+        }
+
+        # Grab the relevant tables for the intent. 
+        # If the intent isn't recognized, default to returning all tables.
+        target_tables = intent_mapping.get(intent, list(schema_registry.keys()))
+
+        # Build a new dictionary containing only the requested tables
+        filtered_schema = {}
+        for table in target_tables:
+            if table in schema_registry:
+                filtered_schema[table] = schema_registry[table]
+
+        # Return the filtered schema as a formatted JSON string for the prompt
+        return json.dumps(filtered_schema, indent=2)

@@ -10,8 +10,9 @@ from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_excep
 
 # Centralized State and Registries
 from state import PlatformState
-from database.schema_registry import schema_registry
-from registry.tool_registry import get_tools_for_intent
+from database.schema_registry import schema_registry, get_schema_for_intent
+# UPDATED: We only need the registry instance now, get_tools_for_intent is removed
+from registry.tool_registry import registry as tool_registry
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -89,12 +90,12 @@ def invoke_orchestrator_llm(formatted_prompt: str) -> OrchestratorOutput:
 def orchestrator_agent(state: PlatformState) -> dict:
     # 🛑 POSITION 1: Entry Checkpoint
     print("\n==================================================")
-    print(" [ORCHESTRATOR NODE] Starting execution...")
-    print(f" [ORCHESTRATOR NODE] Intent: {state.get('intent')} | Sub: {state.get('sub_intent')}")
+    print(" 🚦 [ORCHESTRATOR NODE] Starting execution...")
+    print(f" 🚦 [ORCHESTRATOR NODE] Intent: {state.get('intent')} | Sub: {state.get('sub_intent')}")
     print("==================================================")
     
     user_query = state.get("user_query", "")
-    intent = state.get("intent", "")
+    intent = state.get("intent", "unknown")
     sub_intent = state.get("sub_intent", "")
     entities = state.get("entities", {})
     
@@ -102,8 +103,12 @@ def orchestrator_agent(state: PlatformState) -> dict:
     # We only show the names and descriptions here, not the full columns
     available_tables = "\n".join([f"- {name}: {info.get('description', '')}" for name, info in schema_registry.tables.items()])
     
-    # Get relevant tools based on intent
-    available_tools = get_tools_for_intent(intent)
+    # UPDATED: Fetch the specific tools allowed for this intent using our new registry.
+    # This returns a clean string of tool names and descriptions.
+    available_tools_str = tool_registry.get_tool_descriptions_for_llm(intent)
+    
+    if available_tools_str != "No external tools required.":
+        print(f"✅ Found specific tools for {intent}: \n{available_tools_str}")
     
     prompt_template_str = get_prompt("orchestrator")
     prompt = PromptTemplate.from_template(prompt_template_str)
@@ -114,17 +119,17 @@ def orchestrator_agent(state: PlatformState) -> dict:
         sub_intent=sub_intent,
         entities=json.dumps(entities),
         available_tables=available_tables,
-        available_tools=available_tools
+        available_tools=available_tools_str # UPDATED: Pass the formatted string
     )
     
     try:
         # 🛑 POSITION 2: API Call
-        print(" [ORCHESTRATOR NODE] Evaluating resources and constructing execution plan...")
+        print(" 🚦 [ORCHESTRATOR NODE] Evaluating resources and constructing execution plan...")
         result: OrchestratorOutput = invoke_orchestrator_llm(formatted_prompt)
         
         # 🛑 POSITION 3: Success Checkpoint
         print("--------------------------------------------------")
-        print(" [ORCHESTRATOR NODE] Execution Plan Generated:")
+        print("✅ [ORCHESTRATOR NODE] Execution Plan Generated:")
         print(f"   - Workflow Type:   {result.workflow_type}")
         print(f"   - Required Tables: {result.required_tables}")
         print(f"   - Required Tools:  {result.required_tools}")
@@ -135,7 +140,7 @@ def orchestrator_agent(state: PlatformState) -> dict:
         # ONLY for the tables the orchestrator selected.
         focused_schema_context = schema_registry.get_formatted_menu_for_intent(result.required_tables)
 
-        # Update the state. We inject the focused schema context and the selected workflow.
+        # Update the state. We inject the focused schema context and the available tools.
         return {
             "workflow": result.workflow_type,
             "plan": {
@@ -143,7 +148,8 @@ def orchestrator_agent(state: PlatformState) -> dict:
                 "tools": result.required_tools,
                 "tables": result.required_tables
             },
-            "schema_context": focused_schema_context # This overwrites the global schema with the focused one!
+            "schema_context": focused_schema_context, # Overwrites the global schema with focused one
+            "available_tools": available_tools_str    # NEW: Saves tools to state for downstream agents (Planner/Output)
         }
         
     except Exception as e:

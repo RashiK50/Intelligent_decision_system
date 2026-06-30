@@ -34,12 +34,14 @@ class ValidationStateOutput(BaseModel):
     corrected_sql: Optional[str] = Field(None, description="The adjusted valid SQL block if minor syntax changes occurred")
     issues: Optional[str] = Field(None, description="Description of rule failures if invalid")
 
-
 # ==========================================
 # Core LangGraph State Definition
 # ==========================================
 
 class PlatformState(TypedDict):
+    """
+    The global state dictionary passed through the LangGraph multi-agent workflow.
+    """
     # Core User Metadata
     user_query: str
     schema_context: str
@@ -60,12 +62,17 @@ class PlatformState(TypedDict):
     sql_query: Optional[str]
     sql_validation: Dict[str, Any]
     sql_retry_count: int  # Keeps track of how many self-healing loops have executed
-    raw_db_result: Optional[List[dict[str, Any]]]
+    
+    # Shared Execution (Both Database Agent AND Tool Agent write to this)
+    raw_db_result: Optional[List[Dict[str, Any]]]
     execution_status: Optional[str]
     error_message: Optional[str]
     
-    # Raw Results & Delivery
-    query_result: Optional[List[Dict[str, Any]]]
+    # Final Output Delivery
+    query_result: Optional[List[Dict[str, Any]]] 
     formatted_response: Optional[str]
 
-    workflow: Optional[str] # single_planner, parallel_planners, sequential_planners
+    # Future-proofing / Metadata
+    workflow: Optional[str] 
+    available_tools: Optional[str] 
+    tool_results: Optional[str]
