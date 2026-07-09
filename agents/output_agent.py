@@ -3,7 +3,6 @@ import logging
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from state import PlatformState
-# Assuming you have your prompt loader utility
 from registry.prompt_registry import get_prompt 
 
 # Setup logging
@@ -12,52 +11,44 @@ logger = logging.getLogger(__name__)
 
 def output_agent(state: PlatformState) -> dict:
     """
-    Translates raw database rows and tool outputs into a business-friendly natural language summary.
+    Synthesizes results from parallel nodes into a business-friendly summary.
     """
     print("\n==================================================")
     print(" 🏁 [OUTPUT NODE] Synthesizing Business Insights...")
     print("==================================================")
 
     user_query = state.get("user_query", "")
-    raw_db_result = state.get("raw_db_result")
-    tool_results = state.get("tool_results")  # NEW: Retrieve tool results
+    # Retrieve the unified dictionary
+    parallel_results = state.get("parallel_results", {}) 
     execution_status = state.get("execution_status")
     error_message = state.get("error_message")
 
-    # ==========================================
     # 1. Handle Execution Failures Gracefully
-    # ==========================================
-    if execution_status == "failed" or raw_db_result is None:
-        print("❌ [OUTPUT NODE] Database execution failed. Generating fallback message.")
+    if execution_status == "failed":
+        print("❌ [OUTPUT NODE] Execution failed. Generating fallback message.")
         fallback_msg = (
             f"I encountered an issue retrieving the data for your request. "
-            f"Technical details: {error_message or 'Maximum retry limit reached for SQL generation.'}"
+            f"Technical details: {error_message or 'Workflow failed during execution.'}"
         )
         return {"formatted_response": fallback_msg}
 
-    # ==========================================
     # 2. Handle Empty Results
-    # ==========================================
-    if not raw_db_result and not tool_results:
-        print("⚠️ [OUTPUT NODE] No data (DB or Tool) returned.")
-        empty_msg = "The analysis completed successfully, but no records or calculated results were found matching your criteria."
+    if not parallel_results:
+        print("⚠️ [OUTPUT NODE] No data returned from parallel branches.")
+        empty_msg = "The analysis completed successfully, but no matching records or calculations were found."
         return {"formatted_response": empty_msg}
 
-    # ==========================================
     # 3. Format Prompt & Invoke LLM
-    # ==========================================
     prompt_template_str = get_prompt("output")
     prompt = PromptTemplate.from_template(prompt_template_str)
 
-    # Serialize both DB and Tool data
-    json_db_results = json.dumps(raw_db_result, default=str)
-    # Ensure tool_results are treated as a string for the prompt
-    tool_data_str = json.dumps(tool_results, default=str) if tool_results else "No tool data generated."
+    # Convert the parallel_results dict into a clean JSON string for the LLM
+    # We use default=str to handle any non-serializable objects (like Decimal)
+    context_data = json.dumps(parallel_results, indent=2, default=str)
 
     formatted_prompt = prompt.format(
         user_query=user_query,
-        query_result=json_db_results,
-        tool_results=tool_data_str  # NEW: Pass tool results to the prompt
+        context=context_data 
     )
 
     try:
@@ -66,7 +57,7 @@ def output_agent(state: PlatformState) -> dict:
             temperature=0.3 
         )
         
-        print(" 🏁 [OUTPUT NODE] Generating final narrative with tool insights...")
+        print(" 🏁 [OUTPUT NODE] Generating final narrative with unified insights...")
         response = llm.invoke(formatted_prompt)
         
         print("✅ [OUTPUT NODE] Business insight generated successfully.")
@@ -77,9 +68,7 @@ def output_agent(state: PlatformState) -> dict:
         }
         
     except Exception as e:
-        print("❌ [OUTPUT NODE] CRITICAL ERROR encountered during generation!")
-        print(f"❌ Exception Details: {str(e)}")
-        print("--------------------------------------------------")
+        logger.error(f"Error in Output Node synthesis: {str(e)}")
         return {
             "formatted_response": "An error occurred while synthesizing the final business insights."
         }

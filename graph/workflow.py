@@ -9,6 +9,7 @@ from state import PlatformState
 from agents.guardrail_agent import guardrail_agent
 from agents.orchestrator_agent import orchestrator_agent
 from agents.tool_agent import tool_executor_agent # Ensure this is imported
+from langgraph.constants import Send
 
 def route_after_guardrail(state: PlatformState) -> str:
     if state.get("is_allowed") is True:
@@ -105,3 +106,27 @@ builder.add_edge("output", END)
 from langgraph.checkpoint.memory import MemorySaver
 memory = MemorySaver()
 graph = builder.compile(checkpointer=memory)
+
+def parallel_router(state: PlatformState):
+    """
+    Orchestrator's decision logic: Fan-out to multiple nodes.
+    """
+    tasks = []
+    # If the LLM Orchestrator planned a tool call, add it
+    if "tool_executor" in state.get("required_tools", []):
+        tasks.append(Send("tool_node", state))
+        
+    # If the LLM Orchestrator planned a SQL query, add it
+    if "database_executor" in state.get("required_sql", False):
+        tasks.append(Send("database_executor", state))
+        
+    return tasks
+
+# In your builder definition:
+# Remove the old add_edge("orchestrator", "planner")
+# Replace with:
+builder.add_conditional_edges("orchestrator", parallel_router)
+
+# Ensure both nodes lead back to the Output Node for 'Fan-In'
+builder.add_edge("tool_node", "output")
+builder.add_edge("database_executor", "output")

@@ -76,3 +76,5 @@ class PlatformState(TypedDict):
     workflow: Optional[str] 
     available_tools: Optional[str] 
     tool_results: Optional[str]
+
+    parallel_results: Dict[str, Any]

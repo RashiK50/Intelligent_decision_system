@@ -2,41 +2,41 @@ import os
 import sys
 from state import PlatformState
 
-# Keep the path hack to prevent ModuleNotFoundError
+# Keep the path hack
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# Import the newly created sales tool
 from tools.sales_tools import compare_period_over_period
 
 async def tool_executor_agent(state: PlatformState) -> dict:
     """
-    Executes Python math/logic functions directly, bypassing SQL generation.
+    Executes Python math/logic functions directly. 
+    Writes results to state['parallel_results'] to support parallel execution.
     """
     print("\n==================================================")
     print(" 🛠️ [TOOL EXECUTOR NODE] Executing Python Tool...")
     print("==================================================")
     
-    # 1. Grab the extracted parameters from the Intent Agent
     entities = state.get("entities", {})
     intent = state.get("intent")
     
-    result_text = "Tool execution failed: Unknown intent or missing parameters."
+    parallel_results = state.get("parallel_results", {}).copy()
     
-    # 2. Route to the correct Python function based on Intent
-    if intent == "sales_performance_analysis":
-        
-        # Extract the specific parameters your tool requires from the LLM's entity extraction
+    # 1. Resilience Check: Ensure we have data before we proceed
+    # If the Intent Agent failed to extract these, we stop here with a clear message.
+    current_val_raw = entities.get("current_value")
+    prev_val_raw = entities.get("previous_value")
+    
+    if current_val_raw is None or prev_val_raw is None:
+        result_text = "Sales Tool Error: I could not identify the numerical values needed to perform the comparison. Please check the query formatting."
+    
+    elif intent == "sales_performance_analysis":
         metric = entities.get("metric", "Revenue")
-        
         try:
-            # Safely cast to float in case the LLM passes them as strings
-            current_value = float(entities.get("current_value", 0.0))
-            previous_value = float(entities.get("previous_value", 0.0))
+            current_value = float(current_val_raw)
+            previous_value = float(prev_val_raw)
             
             print(f" 🛠️ [TOOL EXECUTOR NODE] Firing 'compare_period_over_period' for {metric}")
             
-            # Because we decorated the function with @tool in sales_tools.py, 
-            # we execute it using LangChain's .invoke() method with a dictionary
             tool_response = compare_period_over_period.invoke({
                 "metric": metric,
                 "current_value": current_value,
@@ -45,20 +45,21 @@ async def tool_executor_agent(state: PlatformState) -> dict:
             
             result_text = f"Sales Math Tool Calculation: {tool_response}"
             
-        except ValueError:
-            result_text = "Sales Tool Error: Could not convert extracted values into numbers."
+        except (ValueError, TypeError) as e:
+            result_text = f"Sales Tool Error: Could not convert extracted values into numbers. Details: {str(e)}"
         except Exception as e:
             result_text = f"Sales Tool Error: {str(e)}"
-            
     else:
         print(f"❌ [TOOL EXECUTOR NODE] No tool mapped for intent: {intent}")
+        result_text = f"No tool found for intent: {intent}"
 
-    print(f"✅ [TOOL EXECUTOR NODE] Result: {result_text}")
+    # Write the result (either the success string OR the error message) to the state
+    parallel_results["tool_executor"] = [{"System_Tool_Output": result_text}]
+
+    print(f"✅ [TOOL EXECUTOR NODE] Result written to parallel_results")
     print("--------------------------------------------------")
     
-    # 3. Return it mimicking a DB response so the Output Agent works flawlessly
     return {
-        "raw_db_result": [{"System_Tool_Output": result_text}], 
-        "execution_status": "success",
-        "error_message": None
+        "parallel_results": parallel_results,
+        "execution_status": "success"
     }
