@@ -1,6 +1,35 @@
+# Web framework
 fastapi
 uvicorn
-requests
-openai
-psycopg2-binary
+
+# LangGraph / LangChain stack
 langgraph
+langchain-core
+langchain-groq
+langchain-anthropic
+
+# LLM SDKs (langchain-groq uses the openai error spec; anthropic for Claude)
+openai
+groq
+anthropic
+
+# Database
+sqlalchemy
+asyncpg
+psycopg2-binary
+
+# SQL validation
+sqlglot
+
+# Utilities
+pydantic
+python-dotenv
+tenacity
+requests
+
+# Optional: Excel export support for the Export Tool
+openpyxl
+
+# Testing
+pytest
+pytest-asyncio

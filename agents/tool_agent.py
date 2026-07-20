@@ -1,65 +1,81 @@
-import os
-import sys
+"""Generic Tool Executor node.
+
+Runs every tool the Orchestrator selected (state['required_tools']) through
+the Tool Registry. Tool lookup is dynamic — registering a new tool makes it
+available here with zero changes to this file or the graph.
+
+Results are structured dicts merged into state['parallel_results']['tools'];
+the Output Agent synthesizes the final narrative.
+"""
+
 from state import PlatformState
+from registry.tool_registry import registry
+from tools.common import ToolContext
+from utils.logger import get_node_logger, log_node
 
-# Keep the path hack
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+logger = get_node_logger("tool_executor")
 
-from tools.sales_tools import compare_period_over_period
 
+def _build_context(state: PlatformState) -> ToolContext:
+    parallel_results = state.get("parallel_results") or {}
+    return ToolContext(
+        user_query=state.get("user_query", ""),
+        intent=state.get("intent"),
+        entities=state.get("entities") or {},
+        rows=parallel_results.get("database_executor"),
+        plan=state.get("plan") or {},
+    )
+
+
+def _select_tools(state: PlatformState) -> list:
+    """Prefer the Orchestrator's explicit selection; fall back to intent mapping."""
+    requested = [t for t in (state.get("required_tools") or []) if registry.has(t)]
+    if requested:
+        return requested
+
+    intent = state.get("intent") or ""
+    entities = state.get("entities") or {}
+    # Heuristic fallback: user-supplied numbers -> comparison; otherwise KPIs.
+    if entities.get("current_value") is not None and entities.get("previous_value") is not None:
+        return ["compare_period_over_period"]
+    fallback = registry.get_tools_for_intent(intent)
+    return [fallback[0].name] if fallback else []
+
+
+@log_node("tool_executor")
 async def tool_executor_agent(state: PlatformState) -> dict:
-    """
-    Executes Python math/logic functions directly. 
-    Writes results to state['parallel_results'] to support parallel execution.
-    """
     print("\n==================================================")
-    print(" 🛠️ [TOOL EXECUTOR NODE] Executing Python Tool...")
+    print(" 🛠️ [TOOL EXECUTOR NODE] Executing Tools...")
     print("==================================================")
-    
-    entities = state.get("entities", {})
-    intent = state.get("intent")
-    
-    parallel_results = state.get("parallel_results", {}).copy()
-    
-    # 1. Resilience Check: Ensure we have data before we proceed
-    # If the Intent Agent failed to extract these, we stop here with a clear message.
-    current_val_raw = entities.get("current_value")
-    prev_val_raw = entities.get("previous_value")
-    
-    if current_val_raw is None or prev_val_raw is None:
-        result_text = "Sales Tool Error: I could not identify the numerical values needed to perform the comparison. Please check the query formatting."
-    
-    elif intent == "sales_performance_analysis":
-        metric = entities.get("metric", "Revenue")
-        try:
-            current_value = float(current_val_raw)
-            previous_value = float(prev_val_raw)
-            
-            print(f" 🛠️ [TOOL EXECUTOR NODE] Firing 'compare_period_over_period' for {metric}")
-            
-            tool_response = compare_period_over_period.invoke({
-                "metric": metric,
-                "current_value": current_value,
-                "previous_value": previous_value
-            })
-            
-            result_text = f"Sales Math Tool Calculation: {tool_response}"
-            
-        except (ValueError, TypeError) as e:
-            result_text = f"Sales Tool Error: Could not convert extracted values into numbers. Details: {str(e)}"
-        except Exception as e:
-            result_text = f"Sales Tool Error: {str(e)}"
-    else:
-        print(f"❌ [TOOL EXECUTOR NODE] No tool mapped for intent: {intent}")
-        result_text = f"No tool found for intent: {intent}"
 
-    # Write the result (either the success string OR the error message) to the state
-    parallel_results["tool_executor"] = [{"System_Tool_Output": result_text}]
+    context = _build_context(state)
+    tool_names = _select_tools(state)
 
-    print(f"✅ [TOOL EXECUTOR NODE] Result written to parallel_results")
+    if not tool_names:
+        logger.warning("No tools selected or available for intent '%s'", state.get("intent"))
+        return {
+            "parallel_results": {"tools": {"_notice": "No applicable tool found for this request."}},
+            "execution_status": "success",
+        }
+
+    tool_outputs = {}
+    any_success = False
+    for name in tool_names:
+        print(f" 🛠️ [TOOL EXECUTOR NODE] Running '{name}'...")
+        result = registry.execute(name, context)  # never raises
+        tool_outputs[name] = result
+        if result.get("status") == "success":
+            any_success = True
+            print(f"   ✅ '{name}' succeeded")
+        else:
+            print(f"   ⚠️ '{name}' reported: {result.get('error')}")
+
     print("--------------------------------------------------")
-    
+
     return {
-        "parallel_results": parallel_results,
-        "execution_status": "success"
+        "parallel_results": {"tools": tool_outputs},
+        "execution_status": "success" if (any_success or not tool_outputs) else "failed",
+        "error_message": None if any_success else "; ".join(
+            f"{n}: {r.get('error')}" for n, r in tool_outputs.items() if r.get("status") != "success"
+        ) or None,
     }

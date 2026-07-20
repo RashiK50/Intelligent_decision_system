@@ -1,42 +1,24 @@
+"""Legacy /query endpoint.
+
+Kept for backward compatibility; delegates to the same compiled graph as the
+canonical app in main.py. The previous version called graph.invoke()
+synchronously, which crashes on async nodes — this one awaits ainvoke.
+"""
+
+import uuid
+
 from fastapi import FastAPI
 
 from api.request_models import QueryRequest
-
 from graph.workflow import graph
+from state import build_initial_state
 
-
-app = FastAPI(
-    title="Enterprise Decision Intelligence Platform"
-)
+app = FastAPI(title="Enterprise Decision Intelligence Platform (legacy endpoint)")
 
 
 @app.post("/query")
-def query(request: QueryRequest):
-
-    state = {
-
-        "user_query": request.query,
-
-        "intent": None,
-        "sub_intent": None,
-
-        "entities": {},
-
-        "workflow": None,
-
-        "plan": {},
-
-        "sql_query": None,
-
-        "sql_validation": {},
-
-        "query_result": None,
-
-        "formatted_response": None
-    }
-
-    result = graph.invoke(state)
-
-    return {
-        "response": result["formatted_response"]
-    }
+async def query(request: QueryRequest):
+    state = build_initial_state(request.query)
+    config = {"configurable": {"thread_id": str(uuid.uuid4())}}
+    result = await graph.ainvoke(state, config=config)
+    return {"response": result.get("formatted_response") or "No response generated."}

@@ -1,29 +1,45 @@
+"""Intent Agent — classifies the business intent and extracts entities.
+
+Uses the centralized LLM factory and prompt registry. On total LLM failure it
+degrades to a generic intent instead of halting the graph, so the SQL path can
+still attempt an answer.
+"""
+
 import json
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
 
-from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
-from openai import RateLimitError, APIStatusError
-from tenacity import retry, wait_exponential, stop_after_attempt, retry_if_exception_type
 
-# Import your centralized state definition
-from state import PlatformState  
+from state import PlatformState
+from registry.prompt_registry import get_prompt
+from utils.llm import invoke_structured
+from utils.logger import log_node
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ==========================================
-# 1. Pydantic Models for Intent Extraction
-# ==========================================
+FALLBACK_PROMPT = """
+You are an expert Intent Categorization Agent for an Enterprise Decision Intelligence Platform.
+Your job is to categorize the user query and extract matching entities and constraints.
+
+SUPPORTED DOMAINS:
+1. sales_performance_analysis (Sub-intents: revenue_growth, seller_metrics, product_velocity, regional_performance)
+2. inventory_supply_analysis (Sub-intents: stock_levels, stockout_risk, restock_forecasting, supplier_performance)
+
+USER QUERY: "{user_query}"
+
+Analyze the query, choose the most appropriate intent/sub-intent, and fill the structured schema accurately.
+"""
+
 
 class AnalyticalConstraints(BaseModel):
     limit: Optional[int] = Field(None, description="The maximum number of rows requested by the user, e.g., Top 5 -> 5")
     sort_order: Optional[str] = Field(None, description="Requested sorting preference, e.g., 'highest', 'lowest', 'alphabetical'")
     time_grain: Optional[str] = Field(None, description="The granularity of time requested, e.g., 'monthly', 'daily', 'yearly'")
     aggregation_preference: Optional[str] = Field(None, description="Preferred math calculation, e.g., 'sum', 'average', 'percentage_change'")
+
 
 class IntentOutput(BaseModel):
     intent: str = Field(
@@ -38,108 +54,52 @@ class IntentOutput(BaseModel):
             "Key-value pairs extracted for the query. Examples: {'product_id': '123'}, {'start_date': '2026-01-01'}. "
             "CRITICAL: If the query asks to calculate growth or compare numbers, you MUST extract the metric name and values like so: "
             "{'metric': 'Revenue', 'current_value': 500, 'previous_value': 400}."
-        )
+        ),
     )
     analytical_constraints: AnalyticalConstraints = Field(
-        description="Structural or sorting limits requested by the user query."
+        default_factory=AnalyticalConstraints,
+        description="Structural or sorting limits requested by the user query.",
     )
 
-# ==========================================
-# 2. Helper: Centralized Prompt Loader
-# ==========================================
-def get_prompt(prompt_key: str) -> str:
-    """Loads prompt from prompts/prompts.json with a hardcoded fallback if missing."""
-    try:
-        with open("prompts/prompts.json", "r") as f:
-            prompts = json.load(f)
-            active_version = prompts.get(prompt_key, {}).get("active_version", "v1")
-            return prompts.get(prompt_key, {}).get("versions", {}).get(active_version, "")
-    except FileNotFoundError:
-        logger.warning("prompts.json not found. Using fallback Intent prompt.")
-        return """
-        You are an expert Intent Categorization Agent for an Enterprise Decision Intelligence Platform.
-        Your job is to categorize the user query and extract matching entities and constraints.
 
-        SUPPORTED DOMAINS:
-        1. sales_performance_analysis (Sub-intents: revenue_growth, seller_metrics, product_velocity, regional_performance)
-        2. inventory_supply_analysis (Sub-intents: stock_levels, stockout_risk, restock_forecasting, supplier_performance)
-
-        USER QUERY: "{user_query}"
-        
-        Analyze the query, choose the most appropriate intent/sub-intent, and fill the structured schema accurately.
-        """
-
-# ==========================================
-# 3. LLM Call with Retry Logic (Groq API)
-# ==========================================
-@retry(
-    wait=wait_exponential(multiplier=1, min=2, max=10), 
-    stop=stop_after_attempt(3),
-    retry=retry_if_exception_type((RateLimitError, APIStatusError)),
-    before_sleep=lambda retry_state: logger.warning(f"Groq Rate Limit hit in Intent Agent. Retrying... Attempt {retry_state.attempt_number}")
-)
-def invoke_intent_llm(formatted_prompt: str) -> IntentOutput:
-    """Invokes Groq API to extract structured intent configurations."""
-    llm = ChatGroq(
-        model="llama-3.3-70b-versatile",
-        temperature=0.0  # Precise extraction, no variations
-    ).with_structured_output(IntentOutput)
-    
-    return llm.invoke(formatted_prompt)
-
-# ==========================================
-# 4. LangGraph Node Implementation
-# ==========================================
+@log_node("intent")
 def intent_agent(state: PlatformState) -> dict:
-    """
-    LangGraph node that processes the allowed user query to classify intent
-    and extract contextual entities.
-    """
-    # 🛑 POSITION 1: Entry Checkpoint Terminal Log
     print("\n==================================================")
     print(" [INTENT NODE] Starting execution...")
     print(f" [INTENT NODE] Incoming User Query: '{state.get('user_query', '')}'")
     print("==================================================")
-    
+
     user_query = state.get("user_query", "")
-    
-    prompt_template_str = get_prompt("intent")
-    
-    # 🛑 POSITION 2: Prompt Loaded Checkpoint
-    print(f" [INTENT NODE] Prompt template fetched. Length: {len(prompt_template_str)} chars.")
-    
-    prompt = PromptTemplate.from_template(prompt_template_str)
+
+    prompt = PromptTemplate.from_template(get_prompt("intent", fallback=FALLBACK_PROMPT))
     formatted_prompt = prompt.format(user_query=user_query)
-    
+
     try:
-        # 🛑 POSITION 3: API Call Checkpoint
-        print(" [INTENT NODE] Invoking Groq API for Intent Analysis...")
-        
-        result: IntentOutput = invoke_intent_llm(formatted_prompt)
-        
-        # Merge entities and constraints together if desired, or keep track cleanly
-        extracted_entities = result.entities
-        # Add constraints as an inner element of entities to match your central State schema dictionary
+        print(" [INTENT NODE] Invoking LLM for Intent Analysis...")
+        result: IntentOutput = invoke_structured("intent", formatted_prompt, IntentOutput)
+
+        extracted_entities = dict(result.entities)
         extracted_entities["constraints"] = result.analytical_constraints.model_dump()
 
-        # 🛑 POSITION 4: LLM Response Received Checkpoint
         print("--------------------------------------------------")
-        print(" [INTENT NODE] Groq Response Received Successfully:")
+        print(" [INTENT NODE] LLM Response Received Successfully:")
         print(f"   - Intent:     {result.intent}")
         print(f"   - Sub-Intent: {result.sub_intent}")
-        print(f"   - Entities:   {json.dumps(result.entities, indent=2)}")
+        print(f"   - Entities:   {json.dumps(result.entities, indent=2, default=str)}")
         print("--------------------------------------------------")
 
-        # Update and return values directly to the central state variables
         return {
             "intent": result.intent,
             "sub_intent": result.sub_intent,
-            "entities": extracted_entities
+            "entities": extracted_entities,
         }
-        
+
     except Exception as e:
-        # 🛑 POSITION 5: Error Checkpoint
-        print("❌ [INTENT NODE] CRITICAL ERROR encountered during execution!")
-        print(f"❌ [INTENT NODE] Exception Details: {str(e)}")
-        print("--------------------------------------------------")
-        raise e
+        # Graceful degradation: a generic intent still lets the SQL path try.
+        logger.error("Intent extraction failed after retries: %s", e)
+        print(f"❌ [INTENT NODE] LLM failed ({e}); using generic fallback intent.")
+        return {
+            "intent": "sales_performance_analysis",
+            "sub_intent": "general",
+            "entities": {"constraints": AnalyticalConstraints().model_dump()},
+        }

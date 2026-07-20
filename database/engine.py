@@ -16,8 +16,9 @@ if not DATABASE_URL:
 if "postgresql://" in DATABASE_URL and "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://", 1)
     
-# Debug: Print the URL to the terminal so you can see exactly what SQLAlchemy is receiving
-print(f"DEBUG: Initializing SQLAlchemy with URL: {DATABASE_URL}")
+# Debug: show the target host without leaking credentials into logs
+_safe_url = DATABASE_URL.split("@")[-1] if "@" in DATABASE_URL else DATABASE_URL
+print(f"DEBUG: Initializing SQLAlchemy against: {_safe_url}")
 
 # 1. Create the SQLAlchemy Engine
 # Using pool_pre_ping to check connection health before executing queries (great for Supabase)
